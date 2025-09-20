@@ -56,6 +56,16 @@ async function launchBrowser(): Promise<Browser> {
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',
+    '--disable-extensions',
+    '--disable-plugins',
+    '--disable-default-apps',
+    '--disable-sync',
+    '--disable-translate',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--no-default-browser-check',
+    '--no-pings',
+    '--disable-ipc-flooding-protection',
   ];
 
   // Add single-process flag only in production for better resource management
@@ -64,9 +74,10 @@ async function launchBrowser(): Promise<Browser> {
   }
 
   const launchOptions = {
-    headless: true,
+    headless: "new", // Use new headless mode
     args: browserArgs,
     timeout: config.puppeteer.timeout,
+    ignoreDefaultArgs: ['--disable-extensions'], // Allow our custom args
   } as any;
 
   // Only set executablePath if it's explicitly configured
