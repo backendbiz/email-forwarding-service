@@ -34,7 +34,10 @@ RUN apk add --no-cache \
     ttf-freefont \
     curl \
     dumb-init \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+    && which chromium \
+    && ls -la /usr/bin/chromium* \
+    && chromium --version
 
 # Security: Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -43,7 +46,7 @@ RUN addgroup -g 1001 -S nodejs && \
 # Set environment variables
 ENV NODE_ENV=production \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PORT=3000
 
 # Create app directory with proper permissions

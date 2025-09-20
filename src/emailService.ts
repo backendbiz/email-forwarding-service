@@ -129,8 +129,44 @@ async function launchBrowser(): Promise<Browser> {
         error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
       });
       
-      // Fallback 2: Minimal configuration
-      const minimalOptions = {
+      // Fallback 2: Try common executable paths
+      const commonPaths = [
+        '/usr/bin/chromium',           // Alpine Linux default
+        '/usr/bin/chromium-browser',   // Ubuntu/Debian default
+        '/snap/bin/chromium',          // Ubuntu snap
+        '/usr/bin/google-chrome-stable', // Google Chrome
+        '/usr/bin/google-chrome',      // Google Chrome alternative
+      ];
+      
+      for (const execPath of commonPaths) {
+        try {
+          log.info(`Trying executable path: ${execPath}`);
+          const pathOptions = {
+            headless: true,
+            executablePath: execPath,
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--single-process',
+              '--disable-gpu',
+              '--disable-web-security',
+            ],
+            timeout: config.puppeteer.timeout,
+          };
+          
+          return await puppeteer.launch(pathOptions);
+        } catch (pathError) {
+          log.warn(`Failed with path ${execPath}`, {
+            error: pathError instanceof Error ? pathError.message : String(pathError)
+          });
+          continue;
+        }
+      }
+      
+      // Fallback 3: Let Puppeteer auto-detect
+      log.info('Trying auto-detection without executable path');
+      const autoOptions = {
         headless: true,
         args: [
           '--no-sandbox',
@@ -143,7 +179,7 @@ async function launchBrowser(): Promise<Browser> {
         timeout: config.puppeteer.timeout,
       };
       
-      return await puppeteer.launch(minimalOptions);
+      return await puppeteer.launch(autoOptions);
     }
   }
 }
