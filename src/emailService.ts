@@ -66,18 +66,44 @@ async function launchBrowser(): Promise<Browser> {
     '--no-default-browser-check',
     '--no-pings',
     '--disable-ipc-flooding-protection',
+    // Alpine Chromium specific flags
+    '--disable-software-rasterizer',
+    '--disable-background-networking',
+    '--disable-background-timer-throttling',
+    '--disable-client-side-phishing-detection',
+    '--disable-component-extensions-with-background-pages',
+    '--disable-default-apps',
+    '--disable-hang-monitor',
+    '--disable-prompt-on-repost',
+    '--disable-sync',
+    '--metrics-recording-only',
+    '--no-crash-upload',
+    '--no-default-browser-check',
+    '--no-first-run',
+    '--password-store=basic',
+    '--use-mock-keychain',
+    '--disable-features=TranslateUI',
+    '--disable-features=BlinkGenPropertyTrees',
+    '--run-all-compositor-stages-before-draw',
+    '--disable-threaded-animation',
+    '--disable-threaded-scrolling',
+    '--disable-checker-imaging',
+    '--disable-new-content-rendering-timeout',
+    '--disable-image-animation-resync',
   ];
 
-  // Add single-process flag only in production for better resource management
+  // For Alpine containers, use single-process mode always
   if (config.isProduction) {
     browserArgs.push('--single-process');
+    browserArgs.push('--memory-pressure-off'); // Disable memory pressure detection
   }
 
   const launchOptions = {
     headless: "new", // Use new headless mode
     args: browserArgs,
     timeout: config.puppeteer.timeout,
-    ignoreDefaultArgs: ['--disable-extensions'], // Allow our custom args
+    ignoreDefaultArgs: false, // Use all default args plus our custom ones
+    dumpio: false, // Don't dump browser process stdout/stderr
   } as any;
 
   // Only set executablePath if it's explicitly configured
@@ -88,14 +114,37 @@ async function launchBrowser(): Promise<Browser> {
   try {
     return await puppeteer.launch(launchOptions);
   } catch (error) {
-    log.warn('Failed to launch browser with configured executable path, trying with bundled Chromium', {
+    log.warn('Failed to launch browser with configured executable path, trying fallback approaches', {
       configuredPath: config.puppeteer.executablePath,
       error: error instanceof Error ? error.message : String(error)
     });
     
-    // Fallback: try without executablePath (use bundled Chromium)
-    delete launchOptions.executablePath;
-    return await puppeteer.launch(launchOptions);
+    // Fallback 1: Try with old headless mode
+    try {
+      const fallbackOptions = { ...launchOptions, headless: true };
+      delete fallbackOptions.executablePath;
+      return await puppeteer.launch(fallbackOptions);
+    } catch (fallbackError) {
+      log.warn('Fallback 1 failed, trying minimal configuration', {
+        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+      });
+      
+      // Fallback 2: Minimal configuration
+      const minimalOptions = {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-web-security',
+        ],
+        timeout: config.puppeteer.timeout,
+      };
+      
+      return await puppeteer.launch(minimalOptions);
+    }
   }
 }
 
