@@ -111,8 +111,7 @@ app.post(
     try {
       log.info('Processing email forwarding request', {
         requestId: req.headers['x-request-id'],
-        hasSnippet: !!req.body?.data?.object?.snippet,
-        hasBody: !!req.body?.data?.object?.body,
+        url: req.body?.url,
       });
 
       const requestBody: EmailForwardingRequest = req.body;
@@ -123,7 +122,7 @@ app.post(
       log.info('Email forwarding request completed', {
         requestId: req.headers['x-request-id'],
         success: result.success,
-        email: result.email,
+        url: result.url,
         responseTime: result.responseTime,
         alreadyConfirmed: result.alreadyConfirmed,
       });

@@ -2,28 +2,13 @@ import Joi from 'joi';
 
 // Email forwarding request validation schema
 export const emailForwardingRequestSchema = Joi.object({
-  data: Joi.object({
-    object: Joi.object({
-      snippet: Joi.string()
-        .min(10)
-        .max(1000)
-        .required()
-        .messages({
-          'string.empty': 'Snippet is required',
-          'string.min': 'Snippet must be at least 10 characters long',
-          'string.max': 'Snippet must not exceed 1000 characters',
-        }),
-      body: Joi.string()
-        .min(50)
-        .max(50000)
-        .required()
-        .messages({
-          'string.empty': 'Body is required',
-          'string.min': 'Body must be at least 50 characters long',
-          'string.max': 'Body must not exceed 50000 characters',
-        }),
-    }).required(),
-  }).required(),
+  url: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .required()
+    .messages({
+      'string.empty': 'URL is required',
+      'string.uri': 'URL must be a valid HTTP or HTTPS URL',
+    }),
 }).options({
   stripUnknown: true,
   abortEarly: false,

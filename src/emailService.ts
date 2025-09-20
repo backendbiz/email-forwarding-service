@@ -4,12 +4,7 @@ import { log } from './utils/logger';
 import { trackEmailForwardingStart, trackEmailForwardingEnd } from './utils/metrics';
 
 export interface EmailForwardingRequest {
-  data: {
-    object: {
-      snippet: string;
-      body: string;
-    };
-  };
+  url: string;
 }
 
 export interface EmailForwardingResult {
@@ -37,35 +32,11 @@ export class EmailForwardingError extends Error {
 }
 
 /**
- * Extract email address from snippet
+ * Validate if the URL is a Gmail forwarding confirmation URL
  */
-function extractEmailFromSnippet(snippet: string): string | undefined {
-  const emailMatch = snippet.match(/(\S+@\S+\.\S+)/);
-  return emailMatch?.[1];
-}
-
-/**
- * Extract confirmation URLs from email body
- */
-function extractConfirmationUrls(body: string): string[] {
-  const urlPattern = /https:\/\/mail-settings\.google\.com\/mail[^\s,<>]+/g;
-  const matches = body.match(urlPattern) || [];
-  return matches.map(url => url.replace(/(?:\r\n|\r|\n)+$/, '').trim());
-}
-
-/**
- * Validate if the request is a Gmail forwarding confirmation
- */
-function validateForwardingRequest(snippet: string): boolean {
-  const forwardingKeywords = [
-    'has requested to automatically forward mail to your email address',
-    'forward mail to',
-    'forwarding confirmation',
-  ];
-  
-  return forwardingKeywords.some(keyword => 
-    snippet.toLowerCase().includes(keyword.toLowerCase())
-  );
+function validateForwardingUrl(url: string): boolean {
+  const urlPattern = /^https:\/\/mail-settings\.google\.com\/mail/;
+  return urlPattern.test(url);
 }
 
 /**
@@ -92,12 +63,29 @@ async function launchBrowser(): Promise<Browser> {
     browserArgs.push('--single-process');
   }
 
-  return await puppeteer.launch({
+  const launchOptions = {
     headless: true,
     args: browserArgs,
-    executablePath: config.puppeteer.executablePath,
     timeout: config.puppeteer.timeout,
-  });
+  } as any;
+
+  // Only set executablePath if it's explicitly configured
+  if (config.puppeteer.executablePath) {
+    launchOptions.executablePath = config.puppeteer.executablePath;
+  }
+
+  try {
+    return await puppeteer.launch(launchOptions);
+  } catch (error) {
+    log.warn('Failed to launch browser with configured executable path, trying with bundled Chromium', {
+      configuredPath: config.puppeteer.executablePath,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Fallback: try without executablePath (use bundled Chromium)
+    delete launchOptions.executablePath;
+    return await puppeteer.launch(launchOptions);
+  }
 }
 
 /**
@@ -158,35 +146,22 @@ export async function acceptEmailForwardingRequest(
   const startTime = trackEmailForwardingStart();
   const operationStart = Date.now();
   
-  const snippet = requestBody.data.object.snippet;
-  const body = requestBody.data.object.body;
-  const email = extractEmailFromSnippet(snippet);
+  const url = requestBody.url;
   
   let browser: Browser | undefined;
-  let url: string | undefined;
 
   try {
-    // Validate request
-    if (!validateForwardingRequest(snippet)) {
+    // Validate URL
+    if (!validateForwardingUrl(url)) {
       throw new EmailForwardingError(
-        'Invalid forwarding request format',
-        'INVALID_REQUEST_FORMAT',
-        email
+        'Invalid Gmail forwarding URL format',
+        'INVALID_URL_FORMAT',
+        undefined,
+        url
       );
     }
 
-    // Extract URLs
-    const urls = extractConfirmationUrls(body);
-    if (urls.length === 0) {
-      throw new EmailForwardingError(
-        'No confirmation URL found in email body',
-        'URL_NOT_FOUND',
-        email
-      );
-    }
-
-    url = urls[0];
-    log.emailForwarding.start(email || 'unknown', url);
+    log.emailForwarding.start('unknown', url);
 
     // Launch browser
     browser = await launchBrowser();
@@ -208,7 +183,7 @@ export async function acceptEmailForwardingRequest(
     const alreadyConfirmed = await checkIfAlreadyConfirmed(page);
     if (alreadyConfirmed) {
       const responseTime = Date.now() - operationStart;
-      log.emailForwarding.alreadyConfirmed(email || 'unknown');
+      log.emailForwarding.alreadyConfirmed('unknown');
       
       await browser.close();
       trackEmailForwardingEnd(startTime, true);
@@ -216,7 +191,6 @@ export async function acceptEmailForwardingRequest(
       return {
         success: true,
         message: 'Email forwarding already confirmed',
-        email,
         url,
         responseTime,
         alreadyConfirmed: true,
@@ -237,11 +211,10 @@ export async function acceptEmailForwardingRequest(
     trackEmailForwardingEnd(startTime, isConfirmed);
 
     if (isConfirmed) {
-      log.emailForwarding.success(email || 'unknown', responseTime);
+      log.emailForwarding.success('unknown', responseTime);
       return {
         success: true,
         message: 'Email forwarding confirmed successfully',
-        email,
         url,
         responseTime,
         alreadyConfirmed: false,
@@ -250,7 +223,7 @@ export async function acceptEmailForwardingRequest(
       throw new EmailForwardingError(
         'Confirmation failed - page did not update as expected',
         'CONFIRMATION_FAILED',
-        email,
+        undefined,
         url
       );
     }
@@ -259,7 +232,7 @@ export async function acceptEmailForwardingRequest(
     const responseTime = Date.now() - operationStart;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    log.emailForwarding.error(email || 'unknown', errorMessage, responseTime);
+    log.emailForwarding.error('unknown', errorMessage, responseTime);
     
     if (browser) {
       try {
@@ -286,7 +259,6 @@ export async function acceptEmailForwardingRequest(
     return {
       success: false,
       message: 'Internal error during email forwarding process',
-      email,
       url,
       responseTime,
     };

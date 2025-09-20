@@ -20,7 +20,7 @@ const envSchema = Joi.object({
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
   PUPPETEER_TIMEOUT: Joi.number().default(30000),
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: Joi.boolean().default(true),
-  PUPPETEER_EXECUTABLE_PATH: Joi.string().default('/usr/bin/chromium-browser'),
+  PUPPETEER_EXECUTABLE_PATH: Joi.string().default('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
   CORS_ORIGIN: Joi.string().default('*'),
   ENABLE_METRICS: Joi.boolean().default(true),
   METRICS_PORT: Joi.number().port().default(9090),
