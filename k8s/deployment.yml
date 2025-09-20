@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-forwarding-service
+  labels:
+    app: email-forwarding-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: email-forwarding-service
+  template:
+    metadata:
+      labels:
+        app: email-forwarding-service
+        version: v1
+    spec:
+      containers:
+      - name: email-forwarding-service
+        image: ghcr.io/yourusername/email-forwarding-service:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+          value: "true"
+        - name: PUPPETEER_EXECUTABLE_PATH
+          value: "/usr/bin/chromium-browser"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-forwarding-service
+  labels:
+    app: email-forwarding-service
+spec:
+  selector:
+    app: email-forwarding-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: email-forwarding-service
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - email-forwarding.yourdomain.com
+    secretName: email-forwarding-tls
+  rules:
+  - host: email-forwarding.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: email-forwarding-service
+            port:
+              number: 80
