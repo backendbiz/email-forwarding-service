@@ -32,21 +32,28 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    ttf-dejavu \
+    ttf-droid \
+    ttf-liberation \
     curl \
     dumb-init \
-    && rm -rf /var/cache/apk/* \
-    && which chromium \
-    && ls -la /usr/bin/chromium* \
-    && chromium --version
+    && rm -rf /var/cache/apk/*
+
+# Verify Chromium installation and create symlink for consistency
+RUN which chromium-browser 2>/dev/null || which chromium 2>/dev/null && \
+    ls -la /usr/bin/chromium* && \
+    (chromium-browser --version 2>/dev/null || chromium --version 2>/dev/null) && \
+    # Create symlink for consistent path handling
+    ln -sf /usr/bin/chromium-browser /usr/bin/chromium 2>/dev/null || \
+    ln -sf /usr/bin/chromium /usr/bin/chromium-browser 2>/dev/null || true
 
 # Security: Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S appuser -u 1001 -G nodejs
 
-# Set environment variables
+# Set environment variables - let Puppeteer code handle path detection
 ENV NODE_ENV=production \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PORT=3000
 
 # Create app directory with proper permissions
@@ -64,10 +71,10 @@ RUN npm install --omit=dev && \
     rm -rf /tmp/*
 
 # Copy built application from builder stage
-COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder --chown=appuser:nodejs /usr/src/app/dist ./dist
 
-# Copy any additional runtime files if needed
-COPY --chown=appuser:nodejs . .
+# Copy only necessary runtime files (be selective to avoid copying unnecessary files)
+COPY --chown=appuser:nodejs package*.json ./
 
 # Change ownership of the app directory
 RUN chown -R appuser:nodejs /usr/src/app
@@ -81,7 +88,7 @@ EXPOSE 3000
 # Add labels for better container management
 LABEL maintainer="your-email@example.com" \
       version="1.0.0" \
-      description="Production-grade email forwarding service" \
+      description="Production-grade email forwarding service with Alpine Linux" \
       org.opencontainers.image.source="https://github.com/yourusername/email-forwarding-service"
 
 # Health check with improved reliability

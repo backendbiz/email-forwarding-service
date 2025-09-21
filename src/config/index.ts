@@ -20,7 +20,8 @@ const envSchema = Joi.object({
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
   PUPPETEER_TIMEOUT: Joi.number().default(30000),
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: Joi.boolean().default(true),
-  PUPPETEER_EXECUTABLE_PATH: Joi.string().default('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+  // Remove the hardcoded default - let the fallback logic handle path detection
+  PUPPETEER_EXECUTABLE_PATH: Joi.string().optional().allow(''),
   CORS_ORIGIN: Joi.string().default('*'),
   ENABLE_METRICS: Joi.boolean().default(true),
   METRICS_PORT: Joi.number().port().default(9090),
@@ -34,6 +35,31 @@ const { error, value: envVars } = envSchema.validate(process.env);
 
 if (error) {
   throw new Error(`Config validation error: ${error.message}`);
+}
+
+// Helper function to determine the appropriate executable path
+function getPuppeteerExecutablePath(): string | undefined {
+  // If explicitly set in environment, use it
+  if (envVars.PUPPETEER_EXECUTABLE_PATH && envVars.PUPPETEER_EXECUTABLE_PATH.trim() !== '') {
+    return envVars.PUPPETEER_EXECUTABLE_PATH;
+  }
+  
+  // Platform-specific defaults (only for development)
+  if (envVars.NODE_ENV === 'development') {
+    const platform = process.platform;
+    switch (platform) {
+      case 'darwin': // macOS
+        return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      case 'win32': // Windows
+        return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+      case 'linux': // Linux - let fallback logic handle this
+      default:
+        return undefined; // Let Puppeteer auto-detect or use fallback logic
+    }
+  }
+  
+  // For production, staging, test - let fallback logic handle path detection
+  return undefined;
 }
 
 export const config = {
@@ -56,7 +82,7 @@ export const config = {
   puppeteer: {
     timeout: envVars.PUPPETEER_TIMEOUT,
     skipChromiumDownload: envVars.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
-    executablePath: envVars.PUPPETEER_EXECUTABLE_PATH,
+    executablePath: getPuppeteerExecutablePath(),
   },
   
   cors: {

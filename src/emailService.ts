@@ -40,7 +40,7 @@ function validateForwardingUrl(url: string): boolean {
 }
 
 /**
- * Launch Puppeteer browser with production-ready configuration
+ * Launch Puppeteer browser with production-ready configuration and Alpine Linux support
  */
 async function launchBrowser(): Promise<Browser> {
   const browserArgs = [
@@ -69,21 +69,15 @@ async function launchBrowser(): Promise<Browser> {
     // Alpine Chromium specific flags
     '--disable-software-rasterizer',
     '--disable-background-networking',
-    '--disable-background-timer-throttling',
     '--disable-client-side-phishing-detection',
     '--disable-component-extensions-with-background-pages',
-    '--disable-default-apps',
     '--disable-hang-monitor',
     '--disable-prompt-on-repost',
-    '--disable-sync',
     '--metrics-recording-only',
     '--no-crash-upload',
-    '--no-default-browser-check',
-    '--no-first-run',
     '--password-store=basic',
     '--use-mock-keychain',
-    '--disable-features=TranslateUI',
-    '--disable-features=BlinkGenPropertyTrees',
+    '--disable-features=TranslateUI,BlinkGenPropertyTrees',
     '--run-all-compositor-stages-before-draw',
     '--disable-threaded-animation',
     '--disable-threaded-scrolling',
@@ -92,18 +86,18 @@ async function launchBrowser(): Promise<Browser> {
     '--disable-image-animation-resync',
   ];
 
-  // For Alpine containers, use single-process mode always
-  if (config.isProduction) {
+  // For Alpine containers and production, use single-process mode
+  if (config.isProduction || process.env.NODE_ENV === 'production') {
     browserArgs.push('--single-process');
-    browserArgs.push('--memory-pressure-off'); // Disable memory pressure detection
+    browserArgs.push('--memory-pressure-off');
   }
 
   const launchOptions = {
-    headless: "new", // Use new headless mode
+    headless: 'new' as const,
     args: browserArgs,
     timeout: config.puppeteer.timeout,
-    ignoreDefaultArgs: false, // Use all default args plus our custom ones
-    dumpio: false, // Don't dump browser process stdout/stderr
+    ignoreDefaultArgs: false,
+    dumpio: false,
   } as any;
 
   // Only set executablePath if it's explicitly configured
@@ -112,6 +106,11 @@ async function launchBrowser(): Promise<Browser> {
   }
 
   try {
+    log.info('Attempting to launch browser with primary configuration', {
+      executablePath: config.puppeteer.executablePath,
+      headless: launchOptions.headless,
+      argsCount: browserArgs.length
+    });
     return await puppeteer.launch(launchOptions);
   } catch (error) {
     log.warn('Failed to launch browser with configured executable path, trying fallback approaches', {
@@ -119,30 +118,23 @@ async function launchBrowser(): Promise<Browser> {
       error: error instanceof Error ? error.message : String(error)
     });
     
-    // Fallback 1: Try with old headless mode
-    try {
-      const fallbackOptions = { ...launchOptions, headless: true };
-      delete fallbackOptions.executablePath;
-      return await puppeteer.launch(fallbackOptions);
-    } catch (fallbackError) {
-      log.warn('Fallback 1 failed, trying minimal configuration', {
-        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
-      });
-      
-      // Fallback 2: Try common executable paths
-      const commonPaths = [
-        '/usr/bin/google-chrome-stable', // Google Chrome (Ubuntu)
-        '/usr/bin/google-chrome',      // Google Chrome alternative
-        '/usr/bin/chromium-browser',   // Ubuntu/Debian Chromium
-        '/usr/bin/chromium',           // Alpine Linux default
-        '/snap/bin/chromium',          // Ubuntu snap
-      ];
-      
-      for (const execPath of commonPaths) {
+    // Fallback sequence with Alpine-specific paths first
+    const commonPaths = [
+      '/usr/bin/chromium-browser',   // Alpine Linux primary
+      '/usr/bin/chromium',           // Alpine Linux secondary/symlink
+      '/usr/bin/google-chrome-stable', // Ubuntu/Debian
+      '/usr/bin/google-chrome',      // Alternative Chrome
+      '/snap/bin/chromium',          // Ubuntu snap
+    ];
+    
+    // Try each path with both new and old headless modes
+    for (const execPath of commonPaths) {
+      // Try with new headless mode first
+      for (const headlessMode of ['new' as const, true]) {
         try {
-          log.info(`Trying executable path: ${execPath}`);
+          log.info(`Trying executable path: ${execPath} with headless: ${headlessMode}`);
           const pathOptions = {
-            headless: true,
+            headless: headlessMode,
             executablePath: execPath,
             args: [
               '--no-sandbox',
@@ -151,36 +143,61 @@ async function launchBrowser(): Promise<Browser> {
               '--single-process',
               '--disable-gpu',
               '--disable-web-security',
+              '--disable-extensions',
+              '--no-first-run',
+              '--disable-default-apps',
             ],
             timeout: config.puppeteer.timeout,
+            dumpio: false,
           };
           
-          return await puppeteer.launch(pathOptions);
+          const browser = await puppeteer.launch(pathOptions);
+          log.info(`Successfully launched browser with: ${execPath} (headless: ${headlessMode})`);
+          return browser;
         } catch (pathError) {
-          log.warn(`Failed with path ${execPath}`, {
+          log.warn(`Failed with path ${execPath} (headless: ${headlessMode})`, {
             error: pathError instanceof Error ? pathError.message : String(pathError)
           });
           continue;
         }
       }
-      
-      // Fallback 3: Let Puppeteer auto-detect
-      log.info('Trying auto-detection without executable path');
-      const autoOptions = {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-web-security',
-        ],
-        timeout: config.puppeteer.timeout,
-      };
-      
-      return await puppeteer.launch(autoOptions);
     }
+    
+    // Final fallback: Let Puppeteer auto-detect with minimal args
+    for (const headlessMode of ['new' as const, true]) {
+      try {
+        log.info(`Trying auto-detection without executable path (headless: ${headlessMode})`);
+        const autoOptions = {
+          headless: headlessMode,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--single-process',
+            '--disable-gpu',
+            '--disable-web-security',
+          ],
+          timeout: config.puppeteer.timeout,
+          dumpio: false,
+        };
+        
+        const browser = await puppeteer.launch(autoOptions);
+        log.info(`Successfully launched browser with auto-detection (headless: ${headlessMode})`);
+        return browser;
+      } catch (autoError) {
+        log.warn(`Auto-detection failed (headless: ${headlessMode})`, {
+          error: autoError instanceof Error ? autoError.message : String(autoError)
+        });
+        continue;
+      }
+    }
+    
+    // If all attempts failed, throw a comprehensive error
+    log.error('All browser launch attempts failed');
+    throw new EmailForwardingError(
+      'Failed to launch browser after trying all fallback options',
+      'BROWSER_LAUNCH_FAILED'
+    );
   }
 }
 
@@ -189,13 +206,35 @@ async function launchBrowser(): Promise<Browser> {
  */
 async function checkIfAlreadyConfirmed(page: Page): Promise<boolean> {
   try {
-    await page.waitForSelector('p', { timeout: 5000 });
-    const text = await page.$eval('p', (el) => 
-      el.textContent?.trim().toLowerCase() || ''
-    );
-    return text.includes('may now forward mail to');
+    // Wait for page to load and look for confirmation indicators
+    await page.waitForSelector('body', { timeout: 10000 });
+    
+    // Check multiple possible confirmation messages
+    const confirmationTexts = [
+      'may now forward mail to',
+      'forwarding is enabled',
+      'forwarding has been confirmed',
+      'successfully confirmed',
+    ];
+    
+    // Get all text content from the page
+    const pageText = await page.evaluate(() => {
+      return document.body?.textContent?.toLowerCase() || '';
+    });
+    
+    // Check if any confirmation text is present
+    const isConfirmed = confirmationTexts.some(text => pageText.includes(text));
+    
+    log.debug('Checking confirmation status', {
+      pageText: pageText.substring(0, 200) + '...',
+      isConfirmed
+    });
+    
+    return isConfirmed;
   } catch (error) {
-    log.debug('Could not check confirmation status', { error: error instanceof Error ? error.message : String(error) });
+    log.debug('Could not check confirmation status', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
     return false;
   }
 }
@@ -206,18 +245,42 @@ async function checkIfAlreadyConfirmed(page: Page): Promise<boolean> {
 async function clickConfirmationButton(page: Page): Promise<void> {
   const selectors = [
     "input[value='Confirm']",
+    "input[value*='Confirm']",
     "button[type='submit']",
     "input[type='submit'][value*='Confirm']",
     "button:contains('Confirm')",
+    "input[value='Yes']",
+    "button[value='Yes']",
   ];
+
+  // Wait for page to be interactive
+  await page.waitForLoadState?.('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(2000);
 
   for (const selector of selectors) {
     try {
-      const element = await page.$(selector);
-      if (element) {
-        await element.click();
-        log.debug('Clicked confirmation button', { selector });
-        return;
+      // Handle :contains() pseudo-selector manually for button text
+      if (selector.includes(':contains(')) {
+        const buttons = await page.$$('button, input[type="submit"], input[type="button"]');
+        for (const button of buttons) {
+          const text = await button.evaluate((el) => el.textContent || (el as HTMLInputElement).value || '');
+          if (text.toLowerCase().includes('confirm') || text.toLowerCase().includes('yes')) {
+            await button.click();
+            log.debug('Clicked confirmation button by text content', { text });
+            return;
+          }
+        }
+      } else {
+        const element = await page.$(selector);
+        if (element) {
+          // Check if element is visible and clickable
+          const isVisible = await element.isVisible?.() ?? true;
+          if (isVisible) {
+            await element.click();
+            log.debug('Clicked confirmation button', { selector });
+            return;
+          }
+        }
       }
     } catch (error) {
       log.debug('Failed to click with selector', { 
@@ -225,6 +288,24 @@ async function clickConfirmationButton(page: Page): Promise<void> {
         error: error instanceof Error ? error.message : String(error) 
       });
     }
+  }
+
+  // If no button found, try to get more info about the page
+  try {
+    const buttons = await page.$$eval('button, input[type="submit"], input[type="button"]', (elements) => 
+      elements.map(el => ({
+        tagName: el.tagName,
+        type: (el as HTMLInputElement).type || 'N/A',
+        value: (el as HTMLInputElement).value || 'N/A',
+        textContent: el.textContent || 'N/A',
+      }))
+    );
+    
+    log.warn('No confirmation button found. Available buttons:', { buttons });
+  } catch (debugError) {
+    log.debug('Could not analyze page buttons', {
+      error: debugError instanceof Error ? debugError.message : String(debugError)
+    });
   }
 
   throw new EmailForwardingError(
@@ -269,11 +350,46 @@ export async function acceptEmailForwardingRequest(
     );
     await page.setViewport({ width: 1280, height: 720 });
 
-    // Navigate to confirmation URL
-    await page.goto(url, {
-      waitUntil: 'domcontentloaded',
-      timeout: config.puppeteer.timeout,
+    // Add extra headers to appear more like a real browser
+    await page.setExtraHTTPHeaders({
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
     });
+
+    // Navigate to confirmation URL with retry logic
+    let navigationSuccess = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        log.debug(`Navigation attempt ${attempt}`, { url });
+        await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: config.puppeteer.timeout,
+        });
+        navigationSuccess = true;
+        break;
+      } catch (navError) {
+        log.warn(`Navigation attempt ${attempt} failed`, {
+          error: navError instanceof Error ? navError.message : String(navError)
+        });
+        if (attempt === 3) throw navError;
+        await page.waitForTimeout(2000);
+      }
+    }
+
+    if (!navigationSuccess) {
+      throw new EmailForwardingError(
+        'Failed to navigate to confirmation page after multiple attempts',
+        'NAVIGATION_FAILED',
+        undefined,
+        url
+      );
+    }
+
+    // Wait for page to be fully loaded
+    await page.waitForTimeout(3000);
 
     // Check if already confirmed
     const alreadyConfirmed = await checkIfAlreadyConfirmed(page);
@@ -296,11 +412,19 @@ export async function acceptEmailForwardingRequest(
     // Click confirmation button
     await clickConfirmationButton(page);
 
-    // Wait for page to update
-    await page.waitForTimeout(3000);
+    // Wait for page to update with longer timeout
+    await page.waitForTimeout(5000);
 
-    // Verify success
-    const isConfirmed = await checkIfAlreadyConfirmed(page);
+    // Verify success with multiple attempts
+    let isConfirmed = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      isConfirmed = await checkIfAlreadyConfirmed(page);
+      if (isConfirmed) break;
+      
+      log.debug(`Confirmation check attempt ${attempt} - not confirmed yet`);
+      if (attempt < 3) await page.waitForTimeout(2000);
+    }
+
     const responseTime = Date.now() - operationStart;
 
     await browser.close();
