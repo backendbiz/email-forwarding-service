@@ -10,7 +10,9 @@ import { log } from '../utils/logger';
 
 // Request ID middleware
 export const requestId = (req: Request, res: Response, next: NextFunction) => {
-  const requestId = Math.random().toString(36).substring(2, 15);
+  // Use existing request ID if provided, otherwise generate a new one
+  const existingRequestId = req.headers['x-request-id'] as string;
+  const requestId = existingRequestId || Math.random().toString(36).substring(2, 15);
   req.headers['x-request-id'] = requestId;
   res.setHeader('x-request-id', requestId);
   next();

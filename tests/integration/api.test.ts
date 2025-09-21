@@ -1,9 +1,14 @@
 import request from 'supertest';
 import { app } from '../../src/index';
 
+// Test API keys for authentication tests
+const VALID_API_KEY = 'efs_9FYlJGeBhjpQ8dTk-9zI4190VlSpDPdBet-zm74hCwA';
+const INVALID_API_KEY = 'invalid-key-123';
+const TEST_URL = 'https://mail-settings.google.com/mail/u/0/?ui=2&ik=abc123&view=lg&permmsgid=msg-f:1234567890&th=thread-abc123&search=inbox&siml=confirm-forwarding-xyz789';
+
 describe('API Integration Tests', () => {
   describe('GET /health', () => {
-    it('should return health status', async () => {
+    it('should return health status without API key (public endpoint)', async () => {
       const response = await request(app)
         .get('/health')
         .expect(200);
@@ -29,7 +34,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('GET /api-docs', () => {
-    it('should return API documentation', async () => {
+    it('should return API documentation without API key (public endpoint)', async () => {
       const response = await request(app)
         .get('/api-docs')
         .expect(200);
@@ -43,97 +48,152 @@ describe('API Integration Tests', () => {
 
   describe('POST /accept-forwarding', () => {
     const validPayload = {
-      data: {
-        object: {
-          snippet: 'test@example.com has requested to automatically forward mail to your email address',
-          body: 'Please confirm by clicking: https://mail-settings.google.com/mail/confirm?token=abc123',
-        },
-      },
+      url: TEST_URL
     };
 
-    it('should validate request body structure', async () => {
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send({})
-        .expect(400);
+    describe('Authentication', () => {
+      it('should return 401 when API key is missing', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .send(validPayload)
+          .expect(401);
 
-      expect(response.body.error).toBe('Validation error');
-      expect(response.body.details).toBeDefined();
+        expect(response.body.error).toBe('Authentication required');
+        expect(response.body.message).toBe('Missing x-api-key header');
+        expect(response.body.requestId).toBeDefined();
+        expect(response.body.timestamp).toBeDefined();
+      });
+
+      it('should return 403 when API key is invalid', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', INVALID_API_KEY)
+          .send(validPayload)
+          .expect(403);
+
+        expect(response.body.error).toBe('Authentication failed');
+        expect(response.body.message).toBe('Invalid API key');
+        expect(response.body.requestId).toBeDefined();
+        expect(response.body.timestamp).toBeDefined();
+      });
+
+      it('should accept valid API key and process request', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(validPayload);
+
+        // Should not return auth errors (401/403)
+        expect(response.status).not.toBe(401);
+        expect(response.status).not.toBe(403);
+        expect(response.body.requestId).toBeDefined();
+        expect(response.body.timestamp).toBeDefined();
+      });
+
+      it('should work with alternative valid API key', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', 'dev-key-12345')
+          .send(validPayload);
+
+        // Should not return auth errors (401/403)
+        expect(response.status).not.toBe(401);
+        expect(response.status).not.toBe(403);
+        expect(response.body.requestId).toBeDefined();
+      });
+
+      it('should include custom request ID when provided', async () => {
+        const customRequestId = 'test-request-' + Date.now();
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .set('x-request-id', customRequestId)
+          .send(validPayload);
+
+        // Custom request ID should be preserved
+        expect(response.body.requestId).toBe(customRequestId);
+      });
     });
 
-    it('should validate snippet field', async () => {
-      const invalidPayload = {
-        data: {
-          object: {
-            snippet: 'short', // Too short
-            body: validPayload.data.object.body,
-          },
-        },
-      };
+    describe('Validation', () => {
+      it('should validate request body structure', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send({})
+          .expect(400);
 
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send(invalidPayload)
-        .expect(400);
+        expect(response.body.error).toBe('Validation error');
+        expect(response.body.details).toBeDefined();
+      });
 
-      expect(response.body.error).toBe('Validation error');
-      expect(response.body.details.some((d: any) => d.field === 'data.object.snippet')).toBe(true);
+      it('should validate URL field is required', async () => {
+        const invalidPayload = {
+          notUrl: 'invalid'
+        };
+
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(invalidPayload)
+          .expect(400);
+
+        expect(response.body.error).toBe('Validation error');
+        expect(response.body.details.some((d: any) => d.field === 'url')).toBe(true);
+      });
+
+      it('should validate URL format', async () => {
+        const invalidPayload = {
+          url: 'not-a-valid-url'
+        };
+
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(invalidPayload)
+          .expect(400);
+
+        expect(response.body.error).toBe('Validation error');
+        expect(response.body.details.some((d: any) => d.field === 'url')).toBe(true);
+      });
     });
 
-    it('should validate body field', async () => {
-      const invalidPayload = {
-        data: {
-          object: {
-            snippet: validPayload.data.object.snippet,
-            body: 'short', // Too short
-          },
-        },
-      };
+    describe('Response Format', () => {
 
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send(invalidPayload)
-        .expect(400);
+      it('should include request ID in response', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(validPayload);
 
-      expect(response.body.error).toBe('Validation error');
-      expect(response.body.details.some((d: any) => d.field === 'data.object.body')).toBe(true);
-    });
+        expect(response.body.requestId).toBeDefined();
+        expect(typeof response.body.requestId).toBe('string');
+      });
 
-    it('should include request ID in response', async () => {
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send(validPayload);
+      it('should include timestamp in response', async () => {
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(validPayload);
 
-      expect(response.body.requestId).toBeDefined();
-      expect(typeof response.body.requestId).toBe('string');
-    });
+        expect(response.body.timestamp).toBeDefined();
+        expect(new Date(response.body.timestamp)).toBeInstanceOf(Date);
+      });
 
-    it('should include timestamp in response', async () => {
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send(validPayload);
+      it('should handle large URLs within limit', async () => {
+        const largeUrl = 'https://mail-settings.google.com/mail/confirm?' + 'a'.repeat(1000);
+        const largePayload = {
+          url: largeUrl
+        };
 
-      expect(response.body.timestamp).toBeDefined();
-      expect(new Date(response.body.timestamp)).toBeInstanceOf(Date);
-    });
+        const response = await request(app)
+          .post('/accept-forwarding')
+          .set('x-api-key', VALID_API_KEY)
+          .send(largePayload);
 
-    it('should handle large request bodies within limit', async () => {
-      const largeBody = 'a'.repeat(1000); // 1KB body
-      const largePayload = {
-        data: {
-          object: {
-            snippet: validPayload.data.object.snippet,
-            body: largeBody + ' https://mail-settings.google.com/mail/confirm?token=abc123',
-          },
-        },
-      };
-
-      const response = await request(app)
-        .post('/accept-forwarding')
-        .send(largePayload);
-
-      // Should not fail due to size (within 10MB limit)
-      expect(response.status).not.toBe(413);
+        // Should not fail due to size (within 10MB limit)
+        expect(response.status).not.toBe(413);
+      });
     });
   });
 
