@@ -130,7 +130,7 @@ async function launchBrowser(): Promise<Browser> {
     // Try each path with both new and old headless modes
     for (const execPath of commonPaths) {
       // Try with new headless mode first
-      for (const headlessMode of ['new' as const, true]) {
+      for (const headlessMode of [true, false]) {
         try {
           log.info(`Trying executable path: ${execPath} with headless: ${headlessMode}`);
           const pathOptions = {
@@ -164,7 +164,7 @@ async function launchBrowser(): Promise<Browser> {
     }
     
     // Final fallback: Let Puppeteer auto-detect with minimal args
-    for (const headlessMode of ['new' as const, true]) {
+    for (const headlessMode of [true, false]) {
       try {
         log.info(`Trying auto-detection without executable path (headless: ${headlessMode})`);
         const autoOptions = {
@@ -254,8 +254,8 @@ async function clickConfirmationButton(page: Page): Promise<void> {
   ];
 
   // Wait for page to be interactive
-  await page.waitForLoadState?.('domcontentloaded').catch(() => {});
-  await page.waitForTimeout(2000);
+  await page.waitForSelector('body', { timeout: 10000 }).catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 2000));
 
   for (const selector of selectors) {
     try {
@@ -375,7 +375,7 @@ export async function acceptEmailForwardingRequest(
           error: navError instanceof Error ? navError.message : String(navError)
         });
         if (attempt === 3) throw navError;
-        await page.waitForTimeout(2000);
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
@@ -389,7 +389,7 @@ export async function acceptEmailForwardingRequest(
     }
 
     // Wait for page to be fully loaded
-    await page.waitForTimeout(3000);
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Check if already confirmed
     const alreadyConfirmed = await checkIfAlreadyConfirmed(page);
@@ -413,7 +413,7 @@ export async function acceptEmailForwardingRequest(
     await clickConfirmationButton(page);
 
     // Wait for page to update with longer timeout
-    await page.waitForTimeout(5000);
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Verify success with multiple attempts
     let isConfirmed = false;
@@ -422,7 +422,7 @@ export async function acceptEmailForwardingRequest(
       if (isConfirmed) break;
       
       log.debug(`Confirmation check attempt ${attempt} - not confirmed yet`);
-      if (attempt < 3) await page.waitForTimeout(2000);
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
     const responseTime = Date.now() - operationStart;
