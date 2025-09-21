@@ -13,6 +13,7 @@ import {
   requestTimeout,
   errorHandler,
   notFoundHandler,
+  apiKeyAuth,
 } from './middleware';
 import {
   validateRequest,
@@ -38,6 +39,7 @@ app.use(speedLimiter);
 // Request processing middleware
 app.use(requestId);
 app.use(requestLogger);
+app.use(apiKeyAuth);
 app.use(requestTimeout);
 app.use(bodyParser);
 

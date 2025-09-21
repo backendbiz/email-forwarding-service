@@ -28,6 +28,10 @@ const envSchema = Joi.object({
   HEALTH_CHECK_TIMEOUT: Joi.number().default(5000),
   REQUEST_TIMEOUT: Joi.number().default(30000),
   BODY_LIMIT: Joi.string().default('10mb'),
+  // API Key Authentication
+  API_KEY_REQUIRED: Joi.boolean().default(false),
+  API_KEYS: Joi.string().optional().allow(''),
+  API_KEY_HEADER: Joi.string().default('x-api-key'),
 }).unknown();
 
 // Validate environment variables
@@ -98,6 +102,12 @@ export const config = {
     requestTimeout: envVars.REQUEST_TIMEOUT,
     bodyLimit: envVars.BODY_LIMIT,
     healthCheckTimeout: envVars.HEALTH_CHECK_TIMEOUT,
+  },
+  
+  auth: {
+    apiKeyRequired: envVars.API_KEY_REQUIRED,
+    apiKeys: envVars.API_KEYS ? envVars.API_KEYS.split(',').map((key: string) => key.trim()) : [],
+    apiKeyHeader: envVars.API_KEY_HEADER,
   },
 } as const;
 

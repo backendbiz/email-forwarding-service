@@ -37,13 +37,44 @@ curl -X GET http://localhost:3333/metrics \
   -H "Accept: text/plain"
 ```
 
-## 4. Email Forwarding Requests
+## 4. API Key Authentication
+
+### Authentication Required
+When `API_KEY_REQUIRED=true` in your environment configuration, all requests to protected endpoints must include a valid API key.
+
+```bash
+# Missing API key - will return 401
+curl -X POST http://localhost:3333/accept-forwarding \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://mail-settings.google.com/..."}'
+
+# Invalid API key - will return 403
+curl -X POST http://localhost:3333/accept-forwarding \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: invalid-key" \
+  -d '{"url": "https://mail-settings.google.com/..."}'
+
+# Valid API key - will process request
+curl -X POST http://localhost:3333/accept-forwarding \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-secret-api-key-1" \
+  -d '{"url": "https://mail-settings.google.com/..."}'
+```
+
+### Public Endpoints (No API Key Required)
+These endpoints are always accessible without authentication:
+- `GET /health` - Health check
+- `GET /metrics` - Prometheus metrics
+- `GET /api-docs` - API documentation
+
+## 5. Email Forwarding Requests
 
 ### Valid Request - Gmail Forwarding Confirmation
 ```bash
 curl -X POST http://localhost:3333/accept-forwarding \
   -H "Content-Type: application/json" \
   -H "x-request-id: forwarding-$(date +%s)" \
+  -H "x-api-key: your-secret-api-key-1" \
   -d '{
     "url": "https://mail-settings.google.com/mail/u/0/?ui=2&ik=abc123def456&view=lg&permmsgid=msg-f:1234567890&th=thread-abc123&search=inbox&siml=confirm-forwarding-xyz789"
   }'
@@ -54,6 +85,7 @@ curl -X POST http://localhost:3333/accept-forwarding \
 curl -X POST http://localhost:3333/accept-forwarding \
   -H "Content-Type: application/json" \
   -H "x-request-id: alt-forwarding-$(date +%s)" \
+  -H "x-api-key: your-secret-api-key-2" \
   -H "User-Agent: EmailProcessor/2.0" \
   -d '{
     "url": "https://mail-settings.google.com/mail/u/0/?ui=2&ik=xyz789abc123&view=lg&permmsgid=msg-f:9876543210&th=thread-def456&search=inbox&siml=confirm-forwarding-abc123"
@@ -65,6 +97,7 @@ curl -X POST http://localhost:3333/accept-forwarding \
 curl -X POST http://localhost:3333/accept-forwarding \
   -H "Content-Type: application/json" \
   -H "x-request-id: verbose-test-$(date +%s)" \
+  -H "x-api-key: dev-key-12345" \
   -v \
   -d '{
     "url": "https://mail-settings.google.com/mail/u/0/?ui=2&ik=service123&view=lg&permmsgid=msg-f:1357924680&th=thread-service456&search=inbox&siml=confirm-forwarding-service789"

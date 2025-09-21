@@ -44,6 +44,27 @@ A production-grade TypeScript service that automatically accepts Gmail forwardin
 
 ## 🚀 Quick Start
 
+### API Key Authentication (Optional)
+This service supports token-based authentication using API keys:
+
+```bash
+# Generate secure API keys
+node scripts/generate-api-key.js 3
+
+# Enable authentication in .env
+API_KEY_REQUIRED=true
+API_KEYS=efs_your-generated-key-1,efs_your-generated-key-2
+API_KEY_HEADER=x-api-key
+```
+
+**Usage with API Keys:**
+```bash
+curl -X POST http://localhost:3333/accept-forwarding \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: efs_your-generated-key-1" \
+  -d '{"url": "https://mail-settings.google.com/..."}'
+```
+
 ### Using Docker Compose (Recommended)
 
 ```bash

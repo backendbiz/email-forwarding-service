@@ -16,6 +16,67 @@ export const requestId = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// API Key authentication middleware
+export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
+  // Skip authentication if not required
+  if (!config.auth.apiKeyRequired) {
+    return next();
+  }
+
+  // Skip authentication for health check and metrics endpoints
+  if (req.path === '/health' || req.path === '/metrics' || req.path === '/api-docs') {
+    return next();
+  }
+
+  const apiKey = req.headers[config.auth.apiKeyHeader] as string;
+
+  if (!apiKey) {
+    log.warn('API key missing', {
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      requestId: req.headers['x-request-id'],
+    });
+
+    return res.status(401).json({
+      error: 'Authentication required',
+      message: `Missing ${config.auth.apiKeyHeader} header`,
+      requestId: req.headers['x-request-id'],
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Validate API key
+  if (!config.auth.apiKeys.includes(apiKey)) {
+    log.warn('Invalid API key', {
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      requestId: req.headers['x-request-id'],
+      apiKeyPrefix: apiKey.substring(0, 8) + '...',
+    });
+
+    return res.status(403).json({
+      error: 'Authentication failed',
+      message: 'Invalid API key',
+      requestId: req.headers['x-request-id'],
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Log successful authentication
+  log.debug('API key authenticated', {
+    method: req.method,
+    url: req.url,
+    requestId: req.headers['x-request-id'],
+    apiKeyPrefix: apiKey.substring(0, 8) + '...',
+  });
+
+  next();
+};
+
 // Request logging middleware
 export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
