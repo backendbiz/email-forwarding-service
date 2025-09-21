@@ -59,7 +59,7 @@ RUN mkdir -p logs && chown -R appuser:nodejs logs
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm install --only=production && \
+RUN npm install --omit=dev && \
     npm cache clean --force && \
     rm -rf /tmp/*
 

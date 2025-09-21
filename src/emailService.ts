@@ -131,11 +131,11 @@ async function launchBrowser(): Promise<Browser> {
       
       // Fallback 2: Try common executable paths
       const commonPaths = [
-        '/usr/bin/chromium',           // Alpine Linux default
-        '/usr/bin/chromium-browser',   // Ubuntu/Debian default
-        '/snap/bin/chromium',          // Ubuntu snap
-        '/usr/bin/google-chrome-stable', // Google Chrome
+        '/usr/bin/google-chrome-stable', // Google Chrome (Ubuntu)
         '/usr/bin/google-chrome',      // Google Chrome alternative
+        '/usr/bin/chromium-browser',   // Ubuntu/Debian Chromium
+        '/usr/bin/chromium',           // Alpine Linux default
+        '/snap/bin/chromium',          // Ubuntu snap
       ];
       
       for (const execPath of commonPaths) {
