@@ -49,6 +49,7 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
     });
   }
 
+  
   // Validate API key
   if (!config.auth.apiKeys.includes(apiKey)) {
     log.warn('Invalid API key', {
