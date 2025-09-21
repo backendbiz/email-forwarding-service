@@ -120,11 +120,11 @@ async function launchBrowser(): Promise<Browser> {
     
     // Fallback sequence with Alpine-specific paths first
     const commonPaths = [
-      '/usr/bin/chromium-browser',   // Alpine Linux primary
-      '/usr/bin/chromium',           // Alpine Linux secondary/symlink
-      '/usr/bin/google-chrome-stable', // Ubuntu/Debian
-      '/usr/bin/google-chrome',      // Alternative Chrome
-      '/snap/bin/chromium',          // Ubuntu snap
+      '/usr/bin/chromium',           // Ubuntu Nixpacks (move to first)
+      '/usr/bin/google-chrome-stable', // Ubuntu Chrome
+      '/usr/bin/chromium-browser',   // Alpine (less likely now)
+      '/usr/bin/google-chrome',      
+      '/snap/bin/chromium',          
     ];
     
     // Try each path with both new and old headless modes
