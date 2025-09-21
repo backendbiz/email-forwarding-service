@@ -12,22 +12,22 @@ Add these variables to your `.env` file:
 
 ```bash
 # API Key Authentication
-API_KEY_REQUIRED=false          # Set to true to enable authentication
-API_KEYS=key1,key2,key3        # Comma-separated list of valid API keys
-API_KEY_HEADER=x-api-key       # Header name for API key (default: x-api-key)
+EFS_API_KEY_REQUIRED=false          # Set to true to enable authentication
+EFS_API_KEYS=key1,key2,key3        # Comma-separated list of valid API keys
+EFS_API_KEY_HEADER=x-api-key       # Header name for API key (default: x-api-key)
 ```
 
 ### Example Configuration
 
 ```bash
 # Enable API key authentication
-API_KEY_REQUIRED=true
+EFS_API_KEY_REQUIRED=true
 
 # Multiple API keys for different clients/environments
-API_KEYS=efs_prod_abc123,efs_staging_def456,efs_dev_xyz789
+EFS_API_KEYS=efs_prod_abc123,efs_staging_def456,efs_dev_xyz789
 
 # Custom header name (optional)
-API_KEY_HEADER=x-api-key
+EFS_API_KEY_HEADER=x-api-key
 ```
 
 ## Generating API Keys
@@ -111,7 +111,7 @@ response = requests.post(
 
 ### Protected Endpoints
 
-When `API_KEY_REQUIRED=true`, these endpoints require authentication:
+When `EFS_API_KEY_REQUIRED=true`, these endpoints require authentication:
 - `POST /accept-forwarding` - Main email forwarding endpoint
 
 ### Public Endpoints
@@ -166,12 +166,12 @@ These endpoints are always accessible without authentication:
 
 ```bash
 # Production environment
-API_KEY_REQUIRED=true
-API_KEYS=efs_prod_secure_key_1,efs_prod_secure_key_2
+EFS_API_KEY_REQUIRED=true
+EFS_API_KEYS=efs_prod_secure_key_1,efs_prod_secure_key_2
 
 # Development environment  
-API_KEY_REQUIRED=false
-API_KEYS=efs_dev_key_1
+EFS_API_KEY_REQUIRED=false
+EFS_API_KEYS=efs_dev_key_1
 ```
 
 ## Testing
@@ -258,8 +258,8 @@ Authentication metrics are available at `/metrics`:
 
 2. **Update Environment**:
    ```bash
-   API_KEY_REQUIRED=true
-   API_KEYS=generated-key-1,generated-key-2,generated-key-3
+   EFS_API_KEY_REQUIRED=true
+   EFS_API_KEYS=generated-key-1,generated-key-2,generated-key-3
    ```
 
 3. **Update Clients**: Add API key headers to all client requests
@@ -270,7 +270,7 @@ Authentication metrics are available at `/metrics`:
 
 ### Backward Compatibility
 
-- Set `API_KEY_REQUIRED=false` to disable authentication
+- Set `EFS_API_KEY_REQUIRED=false` to disable authentication
 - Existing clients continue to work without changes
 - Public endpoints remain accessible
 - Gradual migration supported
@@ -286,10 +286,10 @@ Authentication metrics are available at `/metrics`:
    - Solution: Check API key value and configuration
 
 3. **Authentication Bypassed**: API key ignored
-   - Solution: Ensure `API_KEY_REQUIRED=true` in environment
+   - Solution: Ensure `EFS_API_KEY_REQUIRED=true` in environment
 
 4. **Wrong Header Name**: Custom header not recognized
-   - Solution: Check `API_KEY_HEADER` configuration
+   - Solution: Check `EFS_API_KEY_HEADER` configuration
 
 ### Debug Mode
 

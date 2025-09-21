@@ -8,9 +8,9 @@ First, ensure your service is configured with API keys:
 
 ```bash
 # In your .env file
-API_KEY_REQUIRED=true
-API_KEYS=efs_prod_abc123,efs_staging_def456,efs_dev_xyz789
-API_KEY_HEADER=x-api-key
+EFS_API_KEY_REQUIRED=true
+EFS_API_KEYS=efs_prod_abc123,efs_staging_def456,efs_dev_xyz789
+EFS_API_KEY_HEADER=x-api-key
 ```
 
 ## 📋 Quick Reference

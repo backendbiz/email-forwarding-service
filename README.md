@@ -52,9 +52,9 @@ This service supports token-based authentication using API keys:
 node scripts/generate-api-key.js 3
 
 # Enable authentication in .env
-API_KEY_REQUIRED=true
-API_KEYS=efs_your-generated-key-1,efs_your-generated-key-2
-API_KEY_HEADER=x-api-key
+EFS_API_KEY_REQUIRED=true
+EFS_API_KEYS=efs_your-generated-key-1,efs_your-generated-key-2
+EFS_API_KEY_HEADER=x-api-key
 ```
 
 **Usage with API Keys:**

@@ -143,8 +143,8 @@ main() {
     
     echo -e "\n${GREEN}✅ Implementation Status: ACTIVE${NC}"
     echo -e "${BLUE}📋 Configuration:${NC}"
-    echo "  • API_KEY_REQUIRED=true"
-    echo "  • API_KEY_HEADER=x-api-key"
+    echo "  • EFS_API_KEY_REQUIRED=true"
+    echo "  • EFS_API_KEY_HEADER=x-api-key"
     echo "  • Valid API Keys: 3 configured"
     echo ""
     echo -e "${BLUE}🔒 Security Features:${NC}"

@@ -29,9 +29,9 @@ const envSchema = Joi.object({
   REQUEST_TIMEOUT: Joi.number().default(30000),
   BODY_LIMIT: Joi.string().default('10mb'),
   // API Key Authentication
-  API_KEY_REQUIRED: Joi.boolean().default(false),
-  API_KEYS: Joi.string().optional().allow(''),
-  API_KEY_HEADER: Joi.string().default('x-api-key'),
+  EFS_API_KEY_REQUIRED: Joi.boolean().default(false),
+  EFS_API_KEYS: Joi.string().optional().allow(''),
+  EFS_API_KEY_HEADER: Joi.string().default('x-api-key'),
 }).unknown();
 
 // Validate environment variables
@@ -105,9 +105,9 @@ export const config = {
   },
   
   auth: {
-    apiKeyRequired: envVars.API_KEY_REQUIRED,
-    apiKeys: envVars.API_KEYS ? envVars.API_KEYS.split(',').map((key: string) => key.trim()) : [],
-    apiKeyHeader: envVars.API_KEY_HEADER,
+    apiKeyRequired: envVars.EFS_API_KEY_REQUIRED,
+    apiKeys: envVars.EFS_API_KEYS ? envVars.EFS_API_KEYS.split(',').map((key: string) => key.trim()) : [],
+    apiKeyHeader: envVars.EFS_API_KEY_HEADER,
   },
 } as const;
 

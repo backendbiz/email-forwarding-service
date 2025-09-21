@@ -40,7 +40,7 @@ curl -X GET http://localhost:3333/metrics \
 ## 4. API Key Authentication
 
 ### Authentication Required
-When `API_KEY_REQUIRED=true` in your environment configuration, all requests to protected endpoints must include a valid API key.
+When `EFS_API_KEY_REQUIRED=true` in your environment configuration, all requests to protected endpoints must include a valid API key.
 
 ```bash
 # Missing API key - will return 401

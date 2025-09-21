@@ -33,9 +33,9 @@ function main() {
     console.log('Generated API Key:');
     console.log(`${apiKey}\n`);
     console.log('Add this to your .env file:');
-    console.log(`API_KEYS=${apiKey}`);
+    console.log(`EFS_API_KEYS=${apiKey}`);
     console.log('\nOr append to existing keys:');
-    console.log(`API_KEYS=existing-key-1,existing-key-2,${apiKey}`);
+    console.log(`EFS_API_KEYS=existing-key-1,existing-key-2,${apiKey}`);
   } else {
     console.log(`Generated ${count} API Keys:\n`);
     const keys = [];
@@ -47,12 +47,12 @@ function main() {
     }
     
     console.log('\nAdd these to your .env file:');
-    console.log(`API_KEYS=${keys.join(',')}`);
+    console.log(`EFS_API_KEYS=${keys.join(',')}`);
   }
   
   console.log('\n📋 Configuration:');
-  console.log('API_KEY_REQUIRED=true');
-  console.log('API_KEY_HEADER=x-api-key');
+  console.log('EFS_API_KEY_REQUIRED=true');
+  console.log('EFS_API_KEY_HEADER=x-api-key');
   
   console.log('\n🔒 Security Notes:');
   console.log('- Store API keys securely');
